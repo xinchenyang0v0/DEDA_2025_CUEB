@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Sep 26 01:48:27 2024
+
+@author: Hua LEI, Wolfgang Karl Härdle
+Improved on Wed Sep 9 01:29:20 2025
+
+@author: Zeyuan WANG
+"""
+import requests
+from bs4 import BeautifulSoup as soup
+import pandas as pd
+import os  # 新增：用于路径操作和目录创建
+
+# 设置保存路径
+save_dir = r'C:\Users\yang_\Desktop'
+save_path = os.path.join(save_dir, 'Chinadaily_business_Scraped_News0709.xlsx')
+
+# 接收中国日报网站的源代码
+scmp_url = 'https://www.chinadaily.com.cn/business/economy'
+url_request = requests.get(scmp_url)
+url_content = url_request.content
+
+# 使用BeautifulSoup解析网页源代码
+parsed_content = soup(url_content, 'html.parser')
+
+# 查找所有新闻部分
+filtered_parts0 = parsed_content.find_all('div', class_="mb10 tw3_01_2")
+filtered_parts1 = parsed_content.find_all('span', class_="tw3_01_2_t")
+page_info = []
+
+# 遍历每个新闻条目
+for section in filtered_parts1:
+    unit_info = {}
+    
+    # (1) 过滤标题和链接
+    filtered_part1 = section.find_all('a', shape="rect")
+    filtered_part2 = section.find_all('b')
+    
+    # (2) 提取标题、链接和日期
+    try:
+        news_title = filtered_part1[0].text.strip()
+        news_link = filtered_part1[0].get('href').strip()
+        news_date = filtered_part2[0].text.strip()
+        news_link = f"https:{news_link}"  # 调整相对链接为绝对链接
+        
+        # (3) 添加信息到字典
+        unit_info['news_title'] = news_title
+        unit_info['news_link'] = news_link
+        unit_info['news_date'] = news_date
+        page_info.append(unit_info)
+    except (IndexError, AttributeError) as e:
+        print(f"跳过错误条目: {e}")
+
+# 创建DataFrame
+df = pd.DataFrame(page_info, columns=['news_title', 'news_link', 'news_date'])
+print(df)
+
+# 确保保存目录存在
+try:
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)  # 创建多级目录
+        print(f"已创建目录: {save_dir}")
+    
+    # 导出到Excel文件
+    df.to_excel(save_path, index=False)
+    print(f"文件已成功保存到: {save_path}")
+except Exception as e:
+    print(f"保存文件时出错: {e}")
+    print(f"尝试手动创建目录: {save_dir}")
