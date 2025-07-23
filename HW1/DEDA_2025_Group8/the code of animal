@@ -1,0 +1,118 @@
+import matplotlib.pyplot as plt
+from matplotlib import animation
+from matplotlib.animation import PillowWriter
+from numpy import append, cos, linspace, pi, sin, zeros
+
+# 优化后的鱼参数（更像鱼的轮廓）
+parameters = [
+    15 + 0j,     # 0: 鱼头位置
+    8 + 6j,      # 1: 鱼背上部曲线
+    8 - 4j,      # 2: 鱼腹下部曲线
+    -12 + 0j,    # 3: 尾柄起点
+    -6 + 8j,     # 4: 尾鳍上部
+    -6 - 8j,     # 5: 尾鳍下部
+    4 + 0j,      # 6: 鱼嘴
+    -2 + 2j,     # 7: 鱼背前部
+    -2 - 2j      # 8: 鱼腹前部
+]
+
+# 傅里叶展开计算坐标
+def fourier(t, C):
+    f = zeros(t.shape)
+    for k in range(len(C)):
+        f += C.real[k] * cos(k * t) - C.imag[k] * sin(k * t)
+    return f
+
+# 鱼形状函数
+def fish(t, p):
+    npar = len(p)
+    Cx = zeros((npar + 1,), dtype='complex')  # +1 为了闭合曲线
+    Cy = zeros((npar + 1,), dtype='complex')
+
+    # 分配参数到傅里叶系数
+    # 身体主要部分
+    Cx[1] = p[0].real * 0.5j  # 鱼头x
+    Cy[1] = p[0].imag * 0.5   # 鱼头y
+    
+    # 鱼背上部
+    Cx[2] = p[1].real * 0.3j
+    Cy[2] = p[1].imag * 0.3
+    
+    # 鱼腹下部
+    Cx[3] = p[2].real * 0.3j
+    Cy[3] = p[2].imag * 0.3
+    
+    # 尾柄
+    Cx[4] = p[3].real * 0.8
+    Cy[4] = p[3].imag * 0.2j
+    
+    # 尾鳍
+    Cx[5] = p[4].real * 1.2
+    Cy[5] = p[4].imag * 0.5j
+    Cx[6] = p[5].real * 1.2
+    Cy[6] = p[5].imag * 0.5j
+    
+    # 鱼嘴和前部细节
+    Cx[7] = p[6].real * 0.2j
+    Cy[7] = p[6].imag * 0.2
+    Cx[8] = p[7].real * 0.3j
+    Cy[8] = p[7].imag * 0.3
+    Cx[9] = p[8].real * 0.3j
+    Cy[9] = p[8].imag * 0.3
+
+    # 闭合曲线
+    Cx[-1] = Cx[0]
+    Cy[-1] = Cy[0]
+
+    x = fourier(t, Cx)
+    y = fourier(t, Cy)
+    return x, y
+
+# 初始化动画
+def init_plot():
+    x, y = fish(linspace(0, 2*pi, 1000), parameters)
+    body.set_data(x, y)
+    return body,
+
+# 动画：鱼游动（身体摆动+尾鳍摆动）
+def move_fish(i):
+    animated_params = parameters.copy()
+    
+    # 身体整体摆动（模拟游动）
+    body_wave = 2 * sin(i * 0.05)
+    animated_params[1] += body_wave * (1 + 0.5j)  # 背上部
+    animated_params[2] += body_wave * (1 - 0.5j)  # 腹下部
+    
+    # 尾鳍强力摆动
+    tail_wiggle = 3 * sin(i * 0.2)
+    animated_params[4] += 0 + tail_wiggle * 1j    # 尾鳍上部
+    animated_params[5] += 0 - tail_wiggle * 1j    # 尾鳍下部
+    
+    x, y = fish(linspace(0, 2*pi, 1000), animated_params)
+    body.set_data(x, y)
+    return body,
+
+# 创建画布
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.set_aspect('equal')
+plt.xlim([-20, 20])
+plt.ylim([-10, 10])
+plt.axis('off')
+body, = ax.plot([], [], 'b-', linewidth=2)  # 动态鱼
+
+# 动画设置
+ani = animation.FuncAnimation(
+    fig=fig,
+    func=move_fish,
+    frames=300,
+    init_func=init_plot,
+    interval=50,
+    blit=True,
+    repeat=True
+)
+
+# 保存GIF
+writer = PillowWriter(fps=30)
+ani.save("realistic_fish.gif", writer=writer)
+
+plt.show()
