@@ -1,0 +1,246 @@
+"""
+DEDA Unit 5
+Basic Statistics and Visualisation in Python
+Authors: Junjie Hu and Isabell Fetzer, 20220924 WKH 
+"""
+
+
+"""
+Interactive Graphs
+"""
+from datetime import datetime, timedelta
+import pandas as pd
+import plotly.graph_objects as go
+import yfinance as yf
+import numpy as np
+import plotly.io as pio
+
+pio.renderers.default = 'browser'
+
+CURRENCY = 'EUR'
+def getData(crypto):
+    now = datetime.now()
+    current_date = now.strftime("%Y-%m-%d")
+    last_year_date = (now - timedelta(days=365)).strftime("%Y-%m-%d")
+    start = pd.to_datetime(last_year_date)
+    end = pd.to_datetime(current_date)
+    data = yf.download(tickers=f'{crypto}-{CURRENCY}', start=start, end=end, interval='1d')
+    return data
+
+try:
+    btc_data = getData('BTC')
+    fig = go.Figure(
+        data=[
+            go.Candlestick(
+                x=btc_data.index,
+                open=btc_data['Open'],
+                high=btc_data['High'],
+                low=btc_data['Low'],
+                close=btc_data['Close']
+            )
+        ])
+    fig.update_layout(
+        title=f'Time Series with Range slider for BTC',
+        xaxis_title='Date',
+        yaxis_title=f'Price ({CURRENCY})',
+        xaxis_rangeslider_visible=True
+    )
+    fig.update_yaxes(tickprefix=CURRENCY)
+    fig.show()
+except Exception as e:
+    print(f"无法获取或显示加密货币数据: {e}")
+
+
+"""
+Generating numbers in numpy array
+"""
+np.random.seed(1)
+A = np.random.randint(low=0, high=50, size=(20, 20))
+print(A)
+
+
+"""
+Matrix Operations
+"""
+try:
+    A_inv = np.linalg.inv(A)
+    print("\n矩阵的逆:")
+    print(A_inv)
+    dot_result = np.dot(A, A_inv)
+    print("\n矩阵与其逆的乘积:")
+    print(dot_result)
+    idn_matrix = np.identity(20)
+    print("\n20x20单位矩阵:")
+    print(idn_matrix)
+    print("\n矩阵乘积是否近似等于单位矩阵:", np.allclose(dot_result, np.eye(20)))
+except np.linalg.LinAlgError:
+    print("错误：矩阵不可逆（可能为奇异矩阵）")
+
+
+"""
+Eigenvalues
+"""
+A = [[3, 1], [1, 1]]
+A_eig = np.linalg.eig(A)
+E_val = A_eig[0]
+Gamma = A_eig[1]
+Lambda = np.diag(E_val)
+AA = np.dot(np.dot(Gamma, Lambda), np.transpose(Gamma))
+print("\n特征值分解是否正确:", np.allclose(AA, A))
+Lambda12 = np.sqrt(Lambda)
+A12 = np.dot(np.dot(Gamma, Lambda12), np.transpose(Gamma))
+
+
+"""
+Fourier Transformation
+"""
+from PIL import Image
+from numpy.fft import fft, ifft
+
+try:
+    image_before = Image.open('berlin_view.jpg')
+    image_int = np.frombuffer(image_before.tobytes(), dtype=np.int8)
+    fft_transformed = fft(image_int)
+    fft_transformed = np.where(np.absolute(fft_transformed) < 9e4, 0, fft_transformed)
+    fft_transformed = ifft(fft_transformed)
+    fft_transformed = np.int8(np.real(fft_transformed))
+    image_output = Image.frombytes(image_before.mode, image_before.size, fft_transformed)
+    image_output.show()
+except FileNotFoundError:
+    print("\n警告：未找到'berlin_view.jpg'文件，请将其放入代码同级目录或替换为实际图片路径")
+except Exception as e:
+    print(f"\n处理图片时出错: {e}")
+
+
+"""
+Normal Distribution
+"""
+import matplotlib.pyplot as plt
+import scipy.stats as stats
+from ipywidgets import interact
+
+plt.rcParams['figure.figsize'] = (10, 8)
+plt.rcParams['figure.dpi'] = 120
+
+def f(mu, sigma, colour):
+    fig = plt.figure(figsize=(10, 8))
+    fig.subplots_adjust(hspace=0.3)
+    fig.patch.set_facecolor('#eeefef')
+    plt.style.use('classic')
+
+    plt.subplot(2, 1, 1)
+    x_axis = np.linspace(mu - 3*sigma, mu + 3*sigma, 1000)
+    plt.plot(x_axis, stats.norm.pdf(x_axis, mu, sigma), c=colour, linewidth=2)
+    plt.xlabel('X')
+    plt.ylabel('pdf')
+    plt.ylim(0, 1)
+    plt.xlim(-10, 10)
+    plt.title(f'概率密度函数 (pdf)：$\mu= {mu}$, $\sigma= {round(sigma,2)}$', fontweight="bold")
+
+    plt.subplot(2, 1, 2)
+    plt.plot(x_axis, stats.norm.cdf(x_axis, mu, sigma), c=colour, linewidth=2)
+    plt.xlabel('X')
+    plt.ylabel('cdf')
+    plt.ylim(0, 1)
+    plt.xlim(-10, 10)
+    plt.title(f'累积分布函数 (cdf)：$\mu= {mu}$, $\sigma= {round(sigma,2)}$', fontweight="bold")
+
+    plt.tight_layout()
+    plt.show()
+
+try:
+    colours = ['red', 'green', 'blue']
+    interact(f, mu=(-10, 10, 1), sigma=(0.5, 5, 0.5), colour=colours)
+    plt.savefig("normal_distribution.png", transparent=True, bbox_inches='tight')
+except Exception as e:
+    print(f"\n无法创建交互式正态分布图: {e}")
+    print("提示：可尝试在Jupyter Notebook中运行此代码以获得完整交互体验")
+
+
+"""
+Kernel Density Estimation
+"""
+# 关键修正：显式导入scipy的norm函数（解决NameError）
+from scipy.stats import norm  
+from sklearn.neighbors import KernelDensity
+
+plt.rcParams['figure.figsize'] = (10, 8)
+plt.rcParams['figure.dpi'] = 120
+
+N = 200
+np.random.seed(1)
+norm_data_1 = np.random.normal(0, 1, int(0.3 * N))
+norm_data_2 = np.random.normal(5, 1, int(0.7 * N))
+norm_data = np.concatenate((norm_data_1, norm_data_2))
+
+X_plot = np.linspace(-5, 10, 1000)
+# 现在可以正确使用norm函数（来自scipy.stats）
+norm_linear = (0.3 * norm(0, 1).pdf(X_plot) + 0.7 * norm(5, 1).pdf(X_plot))
+
+fig, ax = plt.subplots()
+ax.fill(X_plot, norm_linear, fc='black', alpha=0.2, label='线性组合')
+
+try:
+    for kernel in ['gaussian', 'tophat', 'epanechnikov']:
+        kde = KernelDensity(kernel=kernel, bandwidth=0.5).fit(norm_data.reshape(-1, 1))
+        log_dens = kde.score_samples(X_plot.reshape(-1, 1))
+        ax.plot(X_plot, np.exp(log_dens), '-', label=f"核函数 = '{kernel}'")
+
+    ax.text(6, 0.38, f"N={N} 个数据点")
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 0.5))
+    ax.plot(norm_data, -0.005 - 0.01 * np.random.random(norm_data.shape[0]), '+k')
+    ax.set_xlim(-4, 9)
+    ax.set_ylim(-0.03, 0.4)
+    fig.savefig('kernel_estimation.png', dpi=300, transparent=True, bbox_inches='tight')
+    plt.show()
+except Exception as e:
+    print(f"\n核密度估计图表生成失败: {e}")
+
+
+"""
+Box-Muller Method on 2-dim normal distribution
+"""
+np.random.seed(100)
+n = 500
+msize = 0.1
+
+x = -np.log(np.random.uniform(low=0, high=1, size=n))
+a = np.sqrt(2 * x)
+phi = np.random.uniform(low=0, high=2 * np.pi, size=n)
+
+x_coord = a * np.cos(phi)
+y_coord = a * np.sin(phi)
+
+plt.figure(figsize=(7, 7))
+plt.plot(x_coord, y_coord, '.r', markersize=msize)
+plt.title('Box-Muller 生成的二维标准正态分布')
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.grid(True, alpha=0.3)
+plt.savefig('2dimnormal.png', dpi=300, transparent=True)
+plt.show()
+
+
+"""
+对于协方差矩阵Sigma=A：Y = X/sqrt(Sigma) ~ N(0,I) => Y*sqrt(Sigma)
+"""
+A = [[3, 1], [1, 1]]
+A_eig = np.linalg.eig(A)
+E_val = A_eig[0]
+Gamma = A_eig[1]
+Lambda = np.diag(E_val)
+Lambda12 = np.sqrt(Lambda)
+A12 = np.dot(np.dot(Gamma, Lambda12), np.transpose(Gamma))
+
+c = [x_coord, y_coord]
+tfxy = np.dot(A12, c)
+
+plt.figure(figsize=(7, 7))
+plt.plot(tfxy[0], tfxy[1], 'ro', markersize=msize)
+plt.title('应用协方差矩阵后的二维正态分布')
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.axis('equal')
+plt.grid(True, alpha=0.3)
+plt.savefig('transformed_2dimnormal.png', dpi=300, transparent=True)
+plt.show()
